@@ -1,97 +1,86 @@
-# Workshop: Deployments and Deflighting
 
-In this workshop, we'll cover the basics of setting up a barebone deployment pipeline, in support of a green-blue deployment strategy.  We will be able to build upon this exercise in the upcoming homework and DEPLOYMENT milestone.
+#####HW #4 Deployment 
+================
 
-To start with, you'll need some files in this repo to help setup the blue-green infrastructure.
+### Setup
 
-    git clone https://github.com/CSC-DevOps/Deployment.git
-    npm install
+* Clone the Deployment repo, and follow the instructions as shown in the workshop to deploy HW3 application (https://github.com/mahasanath/HW3Queue.git) using blue and green strategy.
+* Install redis and run on localhost:6379 and localhost:6364. This can be achieved through change in config files and running each server instance.
+* Run "node infrastructure.js" , the web application running is ServerInstance1.js.
 
-### Initializing our endpoints.
 
-We'll create two endpoints for our deployment, a "green" endpoint for our baseline, and a "blue" endpoint for our test commits.  We will be using git repositories to help with *copying over bits*.  [See guide](http://toroid.org/ams/git-website-howto) for more details.
+##### Task 1: Complete git/hook setup     
 
-Create a folder structure as follows:
+> -w and --watchDir=deploy/blue-www/ are added to the 'exec' command to facilitate auto-deployment and refresh without having restarted the system. Also, the hooks/post-receive file setup is a git/hookup setup. The snapshot shows the setup:
 
-* deploy/
-  * blue.git/
-  * blue-www/
-  * green.git/
-  * green-www/
 
-To ensure we have a git repo that will always have files that reflect the most current state of the repo, we will use a "bare" repository, which will not have a working tree.  Using a hook script, the changes will then be checked out to public directory.
+post-receive file in 'hooks':
 
-    cd deploy/green.git
-    git init --bare
-    cd ..
-    cd blue.git
-    git init --bare
+````
 
-##### Post-Receive Hook
+````
 
-Inside `$ROOT/green.git/hooks/` inside a `post-receive` file, place the following:
+> /set is completed as follows, and the client.expire command is used to set timeout of 10 s for the key.
 
-    GIT_WORK_TREE=$ROOT/green-www/ git checkout -f
+```
+ app.get('/set',function(req,res){
+	client.lpush("history",req.url);
+	client.set("key", "this message will destruct in 10 sec");
+	client.expire("key",10);
+	res.send('Success!! - Value added for the key in redis on port 3001');
+});
+```
+> /get is completed as follows: 
 
-Repeat for blue.
+```
+> app.get('/get',function(req,res){
+	client.lpush("history",req.url);
+	client.get("key",function(err,value){
+	res.send(value)
+})
+})
 
-**Hints**
+res.send(value) sends back the value associated with the key in the request to the client
+```      
 
-* You must create the *-www folder manually.
-* You may have to add executable permissions using in *nix systems `chmod +x post-receive`.
-* **Ensure that there is a script header**, such as `#!/bin/sh`, on the first line.
-* For the purpose of this workshop, `$ROOT` refers to the absolute path of your folder.
-* It will not work the first time.
+##### Task 2: Create blue/green infrastructure:    
 
-### Deploying Commits and Copying Bits
+> HW3 application on deployment is in blue-www and green-www. Both are running on two different redis instances. The blue instance running on port number 5060 is connected to redis instance running on port number 6379 and green instance running on port number 9090 is connected to redis instance running on port number 6364. 
 
-Clone the [app repo](https://github.com/CSC-DevOps/App), and set the following remotes.  See help on [file protocol syntax](http://en.wikipedia.org/wiki/File_URI_scheme#Format).
+> To enable traffic routing to blue infrastructure by default, change TARGET = GREEN to TARGET = BLUE in 'infrastructure.js' as shown below.
 
-    git remote add blue file://$ROOT/blue.git
-    git remote add green file://$ROOT/green.git
 
-You can now push changes in the following manner.
 
-    git push green master
-    git push blue master
+##### Task 3: Demonstrate /switch route     
 
-You may have to create a simple commit before pushing.
+> upload is completed by running the following CURL command through command promt. Upload is implemented on all three ports 3000,3001 and 3002. If uploaded to ports 3001 or 3002,      
 
-### Testing deployment
+```
+curl -F "image=@./img/morning.jpg" localhost:3001/upload  
+Visit 'meow' to test the "queue" functionality:   
+	http://localhost:3001/meow   
+```
+> It displays the most recently uploded image and remove that image from the queue. Thus establishing the queue functionality.    
+    
+    
+>  upload is completed as follows by adding lpush to push uploaded images to the queue.
 
-Install a node process supervisor, globally, as needed by the demo, run:
+```
+	client.lpush('images',img);
+```   
+##### Task 4: Additional service instance running    
 
-    npm install -g forever
+> Additional service is completed by adding another server instance at 'port 3002'. This is run as a child process using main.js
+ 
+> get, set, recent, upload and meow have been implemented in this server as well. Client requests can be made using    
+"http://localhost:3002/". For example, http://localhost:3002/get
 
-Then bring up the infrastructure:
+##### Task 5: Demonstrate proxy   
 
-    node infrastructure
+> Proxy is implemented in two ways. One method in which I have implemented proxy using "http-proxy" node module, proxy behaves as a load balancer. It redirects all requests on port 80 to either 3001 or 3002 using the round robin scheme. Sample code from simple-balancer.js from the http-proxy library has been used. The code is added to the repository as ProxyHtpp.js.   
 
-When you first run it.  It will not work!  Notice that *-www, doesn't have any node_modules/ installed.  Think about some of the conceptual issues of deploying code versus a build.  For now, you can add into a hook, a step to run: "npm install".
+> Another method is using an other server instance running on port 3000 ( node proxyserver1.js ) which would relay client requests that it receives and redirects it to ports 3001 or 3002. 
 
-You should be able to visit localhost:8080 and access the green slice!
-In expanding on this concept, we could do the same exact steps, but on a different AWS instances, droplets, etc.
+> So for example, a upload on port 3000 has been made using the CURL command.  A meow request made on port 3000, http://localhost:3000/meow would be serviced by either http://localhost:3001/meow or http://localhost:3002/meow, thereby displaying the uploaded images and then removed from the queue.   
 
-### Deploy a change.
-
-Change the message to report, "Hello Blue".  
-
-Push the change.
-
-Test the blue server directly, using port 9090.
-
-Notice, it hasn't updated yet...
-
-You will need to modify how "forever" is run, by including a "--watch" flag which will restart the process if the file it is running changes.  Think carefully on where to place the flag.  You may also need to use "--watchDirectory" depending on where you have placed the deploy folders.
-
-Push another change, "Hello Blue 2".  Now see if you can observe on the blue server.
-
-### Add auto-switch over.
-
-Have the default TARGET to be BLUE now.
-
-Modify the app repo, to explicitly fail with : `res.status(500).send('Something broke!');`
-
-Have a heartbeat that checks every 30 second for a http 500, and if so, will switch the proxy over to the green environment.
-
-This idea can be generalized to be triggered by any other monitoring/alerts/automated testing (during staging). E.g., See how to use [toobusy](https://hacks.mozilla.org/2013/01/building-a-node-js-server-that-wont-melt-a-node-js-holiday-season-part-5/).
+> proxy server is implemented using  "rpoplpush command" to toggle between ports and http 'redirect' is used to re-route the request.
