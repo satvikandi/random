@@ -16,14 +16,7 @@
 ![watchDir](https://github.com/mahasanath/HW4Deployment/blob/master/snaps/exec_commands.png)
 
 
-> Also, the hooks/post-receive file setup is a git/hookup setup. The snapshot shows the setup:
-
-
-post-receive file in 'hooks':
-
-````
-
-````
+> Also, the hooks/post-receive file setup is a git/hookup setup.
 
 
 ##### Task 2: Create blue/green infrastructure:    
