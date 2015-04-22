@@ -32,9 +32,9 @@ post-receive file in 'hooks':
 
 ![Redis instances](https://github.com/mahasanath/HW4Deployment/blob/master/snaps/2_redis_instances.png)
 
-> To enable traffic routing to blue infrastructure by default, change TARGET = GREEN to TARGET = BLUE in 'infrastructure.js' as shown below.
+> To enable traffic routing to blue infrastructure by default, change TARGET = GREEN to TARGET = BLUE in 'infrastructure.js' as shown below. 
 
-![Blue--->green]()
+![Blue--->green](https://github.com/mahasanath/HW4Deployment/blob/master/snaps/target.png)
 
 ##### Task 3: Demonstrate /switch route     
 
